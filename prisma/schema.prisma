@@ -1,0 +1,302 @@
+// This is your Prisma schema file adapted for SQLite local MVP testing
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------ Core Entities ------
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  users                 User[]
+  properties            Property[]
+  units                 Unit[]
+  tenants               Tenant[]
+  leases                Lease[]
+  guarantees            Guarantee[]
+  depositLedgers        DepositLedger[]
+  documents             Document[]
+  contractExtractions   ContractExtraction[]
+  charges               Charge[]
+  payments              Payment[]
+  allocations           Allocation[]
+  expenses              Expense[]
+  maintenanceTickets    MaintenanceTicket[]
+  auditLogs             AuditLog[]
+}
+
+model User {
+  id            String   @id @default(cuid())
+  orgId         String
+  organization  Organization @relation(fields: [orgId], references: [id])
+  
+  name          String?
+  email         String   @unique
+  passwordHash  String
+  role          String     @default("ADMIN")
+  createdAt     DateTime @default(now())
+
+  auditLogs           AuditLog[]
+  confirmedExtractions ContractExtraction[] @relation("UserConfirmedExtraction")
+}
+
+model Property {
+  id           String   @id @default(cuid())
+  orgId        String
+  organization Organization @relation(fields: [orgId], references: [id])
+  
+  name         String
+  address      String
+  city         String
+  notes        String?
+
+  units              Unit[]
+  expenses           Expense[]
+  maintenanceTickets MaintenanceTicket[]
+}
+
+model Unit {
+  id           String   @id @default(cuid())
+  orgId        String
+  organization Organization @relation(fields: [orgId], references: [id])
+  propertyId   String
+  property     Property @relation(fields: [propertyId], references: [id])
+  
+  unitLabel    String   
+  notes        String?
+
+  leases             Lease[]
+  expenses           Expense[]
+  maintenanceTickets MaintenanceTicket[]
+}
+
+model Tenant {
+  id           String   @id @default(cuid())
+  orgId        String
+  organization Organization @relation(fields: [orgId], references: [id])
+  
+  fullName     String
+  documentId   String?  
+  email        String?
+  phone        String?
+  notes        String?
+
+  leases       Lease[]
+}
+
+model Lease {
+  id            String   @id @default(cuid())
+  orgId         String
+  organization  Organization @relation(fields: [orgId], references: [id])
+  
+  unitId        String
+  unit          Unit     @relation(fields: [unitId], references: [id])
+  
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+
+  startDate     DateTime
+  endDate       DateTime
+  currency      String   @default("UYU")
+  rentAmount    Float
+  dueDayOfMonth Int
+  status        String   @default("DRAFT")
+  notes         String?
+
+  guarantees         Guarantee[]
+  depositLedgers     DepositLedger[]
+  documents          Document[]
+  charges            Charge[]
+  payments           Payment[]
+  expenses           Expense[]
+  maintenanceTickets MaintenanceTicket[]
+}
+
+model Guarantee {
+  id             String   @id @default(cuid())
+  orgId          String
+  organization   Organization @relation(fields: [orgId], references: [id])
+  
+  leaseId        String
+  lease          Lease    @relation(fields: [leaseId], references: [id])
+
+  type           String
+  providerName   String?
+  referenceNumber String?
+  amountUYU      Float?
+  startDate      DateTime?
+  endDate        DateTime?
+  status         String   @default("PENDING")
+  notes          String?
+}
+
+model DepositLedger {
+  id             String   @id @default(cuid())
+  orgId          String
+  organization   Organization @relation(fields: [orgId], references: [id])
+  
+  leaseId        String
+  lease          Lease    @relation(fields: [leaseId], references: [id])
+
+  movementDate   DateTime
+  type           String
+  amountUYU      Float
+  notes          String?
+}
+
+model Document {
+  id             String   @id @default(cuid())
+  orgId          String
+  organization   Organization @relation(fields: [orgId], references: [id])
+  
+  leaseId        String
+  lease          Lease    @relation(fields: [leaseId], references: [id])
+
+  type           String
+  fileUrl        String
+  fileName       String
+  mimeType       String?
+  uploadedAt     DateTime @default(now())
+
+  extractions    ContractExtraction[]
+}
+
+model ContractExtraction {
+  id                String   @id @default(cuid())
+  orgId             String
+  organization      Organization @relation(fields: [orgId], references: [id])
+  
+  documentId        String
+  document          Document @relation(fields: [documentId], references: [id])
+
+  extractedText     String?
+  fieldsJson        String?  
+  confidenceJson    String?  
+  status            String @default("PROPOSED")
+  confirmedAt       DateTime?
+  confirmedByUserId String?
+  confirmedByUser   User?    @relation("UserConfirmedExtraction", fields: [confirmedByUserId], references: [id])
+}
+
+model Charge {
+  id             String   @id @default(cuid())
+  orgId          String
+  organization   Organization @relation(fields: [orgId], references: [id])
+  
+  leaseId        String
+  lease          Lease    @relation(fields: [leaseId], references: [id])
+
+  periodYYYYMM   String
+  type           String
+  description    String?
+  amountUYU      Float
+  dueDate        DateTime
+  createdAt      DateTime @default(now())
+
+  allocations    Allocation[]
+}
+
+model Payment {
+  id             String   @id @default(cuid())
+  orgId          String
+  organization   Organization @relation(fields: [orgId], references: [id])
+  
+  leaseId        String
+  lease          Lease    @relation(fields: [leaseId], references: [id])
+
+  paidAt         DateTime
+  amountUYU      Float
+  method         String
+  reference      String?
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  allocations    Allocation[]
+}
+
+model Allocation {
+  id                 String   @id @default(cuid())
+  orgId              String
+  organization       Organization @relation(fields: [orgId], references: [id])
+  
+  paymentId          String
+  payment            Payment  @relation(fields: [paymentId], references: [id])
+  
+  chargeId           String
+  charge             Charge   @relation(fields: [chargeId], references: [id])
+
+  amountAllocatedUYU Float
+}
+
+model Expense {
+  id             String   @id @default(cuid())
+  orgId          String
+  organization   Organization @relation(fields: [orgId], references: [id])
+
+  propertyId     String
+  property       Property @relation(fields: [propertyId], references: [id])
+  
+  unitId         String?
+  unit           Unit?    @relation(fields: [unitId], references: [id])
+  
+  leaseId        String?
+  lease          Lease?   @relation(fields: [leaseId], references: [id])
+
+  date           DateTime
+  category       String
+  description    String?
+  amountUYU      Float
+  vendor         String?
+  createdAt      DateTime @default(now())
+}
+
+model MaintenanceTicket {
+  id             String   @id @default(cuid())
+  orgId          String
+  organization   Organization @relation(fields: [orgId], references: [id])
+
+  propertyId     String
+  property       Property @relation(fields: [propertyId], references: [id])
+  
+  unitId         String?
+  unit           Unit?    @relation(fields: [unitId], references: [id])
+  
+  leaseId        String?
+  lease          Lease?   @relation(fields: [leaseId], references: [id])
+
+  title          String
+  description    String?
+  priority       String   @default("MEDIUM")
+  status         String   @default("OPEN")
+  
+  estimatedCostUYU Float?
+  actualCostUYU    Float?
+  vendor           String?
+  
+  createdAt      DateTime @default(now())
+  closedAt       DateTime?
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  orgId          String
+  organization   Organization @relation(fields: [orgId], references: [id])
+  
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+
+  entityType     String
+  entityId       String
+  action         String
+  beforeJson     String?  
+  afterJson      String?  
+  createdAt      DateTime @default(now())
+}
