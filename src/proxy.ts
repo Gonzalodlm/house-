@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const PROTECTED_PATHS = ['/dashboard', '/api/properties', '/api/units', '/api/tenants', '/api/leases', '/api/dashboard']
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl
     const isProtected = PROTECTED_PATHS.some(p => pathname.startsWith(p))
 
