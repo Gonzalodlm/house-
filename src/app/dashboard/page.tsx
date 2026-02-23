@@ -1,13 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import {
-    BanknotesIcon,
-    BuildingOffice2Icon,
-    UsersIcon,
-    DocumentTextIcon,
-    ClockIcon,
-} from '@heroicons/react/24/outline'
+import { BanknotesIcon, BuildingOffice2Icon, UsersIcon, DocumentTextIcon } from '@heroicons/react/24/outline'
+import { format } from 'date-fns'
+import { es } from 'date-fns/locale'
 
 interface Stats {
     propertiesCount: number
@@ -19,50 +15,49 @@ interface Stats {
     expiring90: number
 }
 
-function fmt(n: number) {
-    return n.toLocaleString('es-UY')
+interface Payment {
+    id: string
+    paidAt: string
+    amountUYU: number
+    method: string
+    lease: { tenant: { fullName: string }; unit: { unitLabel: string; property: { name: string } } }
 }
+
+interface Expense {
+    id: string
+    date: string
+    amountUYU: number
+    category: string
+    property: { name: string }
+}
+
+function fmt(n: number) { return n.toLocaleString('es-UY') }
 
 export default function DashboardPage() {
     const [stats, setStats] = useState<Stats | null>(null)
+    const [payments, setPayments] = useState<Payment[]>([])
+    const [expenses, setExpenses] = useState<Expense[]>([])
 
     useEffect(() => {
-        fetch('/api/dashboard/stats')
-            .then(r => r.json())
-            .then(setStats)
-            .catch(console.error)
+        fetch('/api/dashboard/stats').then(r => r.json()).then(setStats).catch(console.error)
+        fetch('/api/payments').then(r => r.json()).then(p => setPayments(Array.isArray(p) ? p.slice(0, 5) : [])).catch(console.error)
+        fetch('/api/expenses').then(r => r.json()).then(e => setExpenses(Array.isArray(e) ? e.slice(0, 5) : [])).catch(console.error)
     }, [])
 
     const metrics = stats ? [
-        {
-            title: 'Alquiler Mensual Total',
-            value: `$ ${fmt(stats.totalRentUYU)}`,
-            subtitle: 'UYU en contratos activos',
-            icon: BanknotesIcon,
-            color: 'bg-emerald-100 text-emerald-600',
-        },
-        {
-            title: 'Contratos Activos',
-            value: String(stats.activeLeasesCount),
-            subtitle: 'alquileres vigentes',
-            icon: DocumentTextIcon,
-            color: 'bg-blue-100 text-blue-600',
-        },
-        {
-            title: 'Propiedades',
-            value: String(stats.propertiesCount),
-            subtitle: 'inmuebles registrados',
-            icon: BuildingOffice2Icon,
-            color: 'bg-indigo-100 text-indigo-600',
-        },
-        {
-            title: 'Inquilinos',
-            value: String(stats.tenantsCount),
-            subtitle: 'en la base de datos',
-            icon: UsersIcon,
-            color: 'bg-amber-100 text-amber-600',
-        },
+        { title: 'Alquiler Mensual Total', value: `$ ${fmt(stats.totalRentUYU)}`, subtitle: 'UYU en contratos activos', icon: BanknotesIcon, color: 'bg-emerald-100 text-emerald-600' },
+        { title: 'Contratos Activos', value: String(stats.activeLeasesCount), subtitle: 'alquileres vigentes', icon: DocumentTextIcon, color: 'bg-blue-100 text-blue-600' },
+        { title: 'Propiedades', value: String(stats.propertiesCount), subtitle: 'inmuebles registrados', icon: BuildingOffice2Icon, color: 'bg-indigo-100 text-indigo-600' },
+        { title: 'Inquilinos', value: String(stats.tenantsCount), subtitle: 'en la base de datos', icon: UsersIcon, color: 'bg-amber-100 text-amber-600' },
     ] : []
+
+    const totalCobrosEstesMes = payments
+        .filter(p => new Date(p.paidAt).getMonth() === new Date().getMonth())
+        .reduce((s, p) => s + p.amountUYU, 0)
+
+    const totalGastosEsteMes = expenses
+        .filter(e => new Date(e.date).getMonth() === new Date().getMonth())
+        .reduce((s, e) => s + e.amountUYU, 0)
 
     return (
         <div className="p-8 space-y-8 animate-in fade-in duration-500">
@@ -86,9 +81,7 @@ export default function DashboardPage() {
                         <div key={m.title} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover-lift flex flex-col justify-between h-40">
                             <div className="flex justify-between items-start mb-4">
                                 <h2 className="text-slate-600 font-medium text-sm w-3/4">{m.title}</h2>
-                                <div className={`p-2 rounded-xl ${m.color}`}>
-                                    <m.icon className="w-6 h-6" />
-                                </div>
+                                <div className={`p-2 rounded-xl ${m.color}`}><m.icon className="w-6 h-6" /></div>
                             </div>
                             <div>
                                 <p className="text-2xl font-bold text-slate-900">{m.value}</p>
@@ -101,7 +94,8 @@ export default function DashboardPage() {
 
             {stats && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    {/* Vencimientos */}
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                         <h3 className="text-lg font-bold text-slate-800 mb-6 flex justify-between items-center">
                             Próximos Vencimientos
                             <span className="text-xs bg-slate-100 text-slate-500 px-2 py-1 rounded">Contratos</span>
@@ -122,21 +116,49 @@ export default function DashboardPage() {
                         </div>
                     </div>
 
-                    <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center">
-                        <ClockIcon className="w-12 h-12 text-slate-300 mb-4" />
-                        <p className="text-slate-500 text-sm">
-                            El módulo de rentabilidad por propiedad estará disponible<br />cuando registres pagos y gastos en los contratos.
-                        </p>
-                        <div className="mt-6 grid grid-cols-2 gap-6 w-full max-w-sm text-left">
-                            <div className="bg-slate-50 rounded-xl p-4">
-                                <p className="text-xs text-slate-500 font-medium">Total propiedades</p>
-                                <p className="text-2xl font-bold text-slate-900 mt-1">{stats.propertiesCount}</p>
+                    {/* Rentabilidad este mes */}
+                    <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                        <h3 className="text-lg font-bold text-slate-800 mb-6">Resumen del Mes</h3>
+                        <div className="grid grid-cols-3 gap-4 mb-6">
+                            <div className="bg-emerald-50 rounded-xl p-4 text-center">
+                                <p className="text-xs text-emerald-600 font-semibold uppercase mb-1">Cobros</p>
+                                <p className="text-xl font-bold text-emerald-700">$ {fmt(totalCobrosEstesMes)}</p>
                             </div>
-                            <div className="bg-slate-50 rounded-xl p-4">
-                                <p className="text-xs text-slate-500 font-medium">Total inquilinos</p>
-                                <p className="text-2xl font-bold text-slate-900 mt-1">{stats.tenantsCount}</p>
+                            <div className="bg-red-50 rounded-xl p-4 text-center">
+                                <p className="text-xs text-red-500 font-semibold uppercase mb-1">Gastos</p>
+                                <p className="text-xl font-bold text-red-600">$ {fmt(totalGastosEsteMes)}</p>
+                            </div>
+                            <div className={`rounded-xl p-4 text-center ${totalCobrosEstesMes - totalGastosEsteMes >= 0 ? 'bg-blue-50' : 'bg-orange-50'}`}>
+                                <p className="text-xs font-semibold uppercase mb-1 text-blue-600">Neto</p>
+                                <p className={`text-xl font-bold ${totalCobrosEstesMes - totalGastosEsteMes >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>
+                                    $ {fmt(totalCobrosEstesMes - totalGastosEsteMes)}
+                                </p>
                             </div>
                         </div>
+
+                        {/* Últimos cobros */}
+                        {payments.length > 0 && (
+                            <div>
+                                <p className="text-xs text-slate-500 font-semibold uppercase mb-3">Últimos cobros</p>
+                                <div className="space-y-2">
+                                    {payments.slice(0, 3).map(p => (
+                                        <div key={p.id} className="flex justify-between items-center text-sm">
+                                            <div>
+                                                <span className="font-medium text-slate-800">{p.lease.tenant.fullName}</span>
+                                                <span className="text-slate-400 text-xs ml-2">{format(new Date(p.paidAt), 'dd/MM/yy', { locale: es })}</span>
+                                            </div>
+                                            <span className="font-bold text-emerald-600">$ {fmt(p.amountUYU)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {payments.length === 0 && expenses.length === 0 && (
+                            <p className="text-slate-400 text-sm text-center py-4">
+                                Registrá cobros y gastos para ver la rentabilidad aquí.
+                            </p>
+                        )}
                     </div>
                 </div>
             )}
