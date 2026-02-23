@@ -1,13 +1,12 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
     LayoutDashboard,
     Building2,
     Users,
     FileText,
-    Settings,
     LogOut,
     Menu
 } from 'lucide-react'
@@ -26,7 +25,13 @@ export default function DashboardLayout({
     children: React.ReactNode
 }) {
     const pathname = usePathname()
+    const router = useRouter()
     const [sidebarOpen, setSidebarOpen] = useState(false)
+
+    const handleLogout = async () => {
+        await fetch('/api/auth/logout', { method: 'POST' })
+        router.push('/login')
+    }
 
     return (
         <div className="flex h-screen bg-slate-50 overflow-hidden font-sans text-slate-900">
@@ -73,13 +78,13 @@ export default function DashboardLayout({
                     </nav>
 
                     <div className="p-4 border-t border-slate-100 pb-8">
-                        <Link
-                            href="/login"
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-600 hover:bg-red-50 hover:text-red-700 transition-colors"
+                        <button
+                            onClick={handleLogout}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-600 hover:bg-red-50 hover:text-red-700 transition-colors"
                         >
                             <LogOut className="w-5 h-5" />
                             Cerrar Sesión
-                        </Link>
+                        </button>
                     </div>
                 </div>
             </aside>

@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase/client'
 import { LogIn, KeyRound } from 'lucide-react'
 
 export default function LoginPage() {
@@ -17,29 +16,23 @@ export default function LoginPage() {
         setLoading(true)
         setError(null)
 
-        // Bypass MVP fallback since Supabase requires creds:
-        // If we want MVP to just 'work' if env vars aren't fully set, we allow dummy login.
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL || email === 'admin@proyectohouse.com') {
-            router.push('/dashboard')
-            return;
-        }
-
-        const { error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
+        const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password }),
         })
 
-        if (error) {
-            setError(error.message)
-            setLoading(false)
-        } else {
+        if (res.ok) {
             router.push('/dashboard')
+        } else {
+            const data = await res.json()
+            setError(data.error || 'Error al iniciar sesión')
+            setLoading(false)
         }
     }
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4 relative overflow-hidden">
-            {/* Dynamic Background Elements */}
             <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
             <div className="absolute top-[20%] right-[-10%] w-96 h-96 bg-indigo-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
             <div className="absolute bottom-[-10%] left-[20%] w-96 h-96 bg-pink-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
@@ -103,6 +96,10 @@ export default function LoginPage() {
                         )}
                     </button>
                 </form>
+
+                <p className="text-center text-xs text-slate-400 mt-6">
+                    admin@proyectohouse.com / adminpassword
+                </p>
             </div>
 
             <style jsx global>{`
@@ -112,15 +109,9 @@ export default function LoginPage() {
           66% { transform: translate(-20px, 20px) scale(0.9); }
           100% { transform: translate(0px, 0px) scale(1); }
         }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
+        .animate-blob { animation: blob 7s infinite; }
+        .animation-delay-2000 { animation-delay: 2s; }
+        .animation-delay-4000 { animation-delay: 4s; }
       `}</style>
         </div>
     )
