@@ -24,7 +24,8 @@ export async function POST(req: NextRequest) {
             maxAge: 60 * 60 * 24 * 7,
         })
         return response
-    } catch {
-        return NextResponse.json({ error: 'Error del servidor' }, { status: 500 })
+    } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e)
+        return NextResponse.json({ error: msg }, { status: 500 })
     }
 }
